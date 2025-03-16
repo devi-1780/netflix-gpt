@@ -3,18 +3,70 @@ import Description from "./Description";
 import { useState } from "react";
 import { checkValidate } from "../utils/checkValidate";
 import { useRef } from "react";
+import {auth} from "../utils/firebase";
+import {createUserWithEmailAndPassword,signInWithEmailAndPassword,updateProfile} from "firebase/auth";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
 const Login=()=>{
+    let dispatch=useDispatch();
+    let navigate=useNavigate();
     let [isSignInForm,setIsSignInForm]=useState(true);
     let [errorMessage,setErrorMessage]=useState(null);
     const email=useRef(null);
     const password=useRef(null);
-    const name=useRef(null);
+    const username=useRef(null);
     function handleToggleBtn(){
        setIsSignInForm(!isSignInForm);
     }
     function handleSubmitingForm(){
+        console.log('form')
         const message=checkValidate(email.current.value,password.current.value);
-        setErrorMessage(message)
+        setErrorMessage(message);
+        if(message) return;
+        if(!isSignInForm){
+            console.log('hi')
+            //sign up logic
+            createUserWithEmailAndPassword(auth, email.current.value, password.current.value)
+            .then((userCredential) => {
+                // Signed up 
+                const user = userCredential.user;
+                updateProfile(auth.currentUser, {
+                    displayName: username.current.value, photoURL: "https://example.com/jane-q-user/profile.jpg"
+                  }).then(() => {
+                    const {uid,displayName,email }= auth.currentUser;
+                   dispatch(addUser({uid:uid,email:email ,displayName:displayName}))
+                    navigate("/browse")
+                  }).catch((error) => {
+                    // An error occurred
+                    setErrorMessage(error)
+                  });
+                console.log(user);
+                
+          })
+       .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        setErrorMessage(errorCode+"-"+errorMessage)
+        // ..
+        });
+
+        }else{
+            //sign in logic
+            signInWithEmailAndPassword(auth, email.current.value, password.current.value)
+            .then((userCredential) => {
+                // Signed in 
+                const user = userCredential.user;
+                console.log(user);
+                navigate("/browse")
+            })
+            .catch((error) => {
+                const errorCode = error.code;
+                const errorMessage = error.message;
+                setErrorMessage(errorCode+"-"+errorMessage)
+            });
+
+        }
     }
     return(
         <div>
@@ -29,6 +81,7 @@ const Login=()=>{
             {
                 isSignInForm?null:
                 <input 
+                ref={username}
                 type="text"
                 placeholder="Full Name"
                 className="bg-transparent text-white border border-solid rounded border-slate-300 p-4 m-4 w-11/12 bg-black bg-opacity-75"
@@ -50,7 +103,7 @@ const Login=()=>{
             <button
             onClick={handleSubmitingForm}
             className="text-white bg-red-700 m-4 w-11/12 p-2 text-center rounded"
-            >Sign In</button> 
+            >{isSignInForm?"Sing In":"Sign Up"}</button> 
             <p onClick={handleToggleBtn}
              className="text-white m-4 font-bold text-base cursor-pointer"
              >
